@@ -21,7 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Router from "next/router";
+import { useRouter } from "next/navigation";
+import { useRoleGuard } from "@/hooks/use-role-guard";
+import { ROLES } from "@/lib/auth/roles";
 
 export interface PermintaanDesain {
   id: string;
@@ -35,7 +37,7 @@ export interface PermintaanDesain {
   rating: string;
   review: string;
   requester: string;
-  admin: string;
+  assigned_designer: string;
   files: File[];
 }
 
@@ -71,6 +73,7 @@ const dataProject: ComboboxData = [
 ];
 
 export default function BuatPermintaanDesainPage() {
+  useRoleGuard([ROLES.REQUESTER]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
@@ -81,7 +84,7 @@ export default function BuatPermintaanDesainPage() {
 
   const s = createClient();
 
-  const { push } = Router;
+  const { push } = useRouter();
 
   // --- FUNGSI UNTUK MENGELOLA LAMPIRAN ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

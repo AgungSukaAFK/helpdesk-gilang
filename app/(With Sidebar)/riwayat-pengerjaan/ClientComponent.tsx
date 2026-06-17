@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import Link from "next/link";
+import { useRoleGuard } from "@/hooks/use-role-guard";
+import { ROLES } from "@/lib/auth/roles";
 
 // Definisikan tipe data sesuai struktur tabel permintaan
 interface RiwayatItem {
@@ -51,10 +53,19 @@ export function RiwayatAdminClientContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Guard: riwayat pengerjaan milik desainer.
+  useRoleGuard([ROLES.DESIGNER]);
+
   // State
   const [riwayatList, setRiwayatList] = useState<RiwayatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalItems, setTotalItems] = useState<number>(0);
+  const [kpi, setKpi] = useState<{
+    jumlah_selesai: number;
+    avg_ketepatan: number | null;
+    avg_kualitas: number | null;
+    avg_kpi: number | null;
+  } | null>(null);
 
   // State dari URL
   const currentPage = Number(searchParams.get("page") || "1");
@@ -101,10 +112,8 @@ export function RiwayatAdminClientContent() {
         .from("permintaan")
         .select("*", { count: "exact" })
         .eq("status", "DONE")
+        .eq("assigned_designer", user.id) // hanya pekerjaan desainer yang login
         .order("due_date", { ascending: false });
-
-      // Opsional: Jika ingin memfilter hanya pekerjaan admin yang sedang login
-      // query = query.eq("admin", user.id);
 
       if (searchTerm) {
         query = query.ilike("judul", `%${searchTerm}%`);
@@ -188,8 +197,49 @@ export function RiwayatAdminClientContent() {
     return () => clearTimeout(handler);
   }, [searchInput, pathname, router, createQueryString]);
 
+  // Ambil ringkasan KPI pribadi desainer.
+  useEffect(() => {
+    async function fetchKpi() {
+      const {
+        data: { user },
+      } = await s.auth.getUser();
+      if (!user) return;
+      const { data } = await s.rpc("get_designer_kpi_report", {
+        p_designer: user.id,
+      });
+      if (Array.isArray(data) && data.length > 0) setKpi(data[0]);
+      else setKpi({ jumlah_selesai: 0, avg_ketepatan: null, avg_kualitas: null, avg_kpi: null });
+    }
+    fetchKpi();
+  }, [s]);
+
   return (
     <Content title="Riwayat Pekerjaan Selesai" size="lg">
+      {/* PANEL KPI PRIBADI DESAINER (dari RPC get_designer_kpi_report) */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Rata-rata Ketepatan Waktu", value: kpi?.avg_ketepatan },
+          { label: "Rata-rata Kualitas (Rating)", value: kpi?.avg_kualitas },
+          { label: "Rata-rata KPI Akhir", value: kpi?.avg_kpi },
+        ].map((m) => (
+          <Card key={m.label} className="bg-muted/30">
+            <CardHeader className="pb-2">
+              <CardDescription>{m.label}</CardDescription>
+              <CardTitle className="text-2xl">
+                {m.value === null || m.value === undefined
+                  ? "—"
+                  : Number(m.value).toFixed(1)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Dari {kpi?.jumlah_selesai ?? 0} tugas selesai.
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       {/* Search Bar */}
       <div className="flex justify-center mb-6">
         <div className="relative w-full md:w-2/3 lg:w-1/2">
@@ -301,7 +351,7 @@ export function RiwayatAdminClientContent() {
                   size="sm"
                   asChild
                 >
-                  <Link href={`/permintaan-desain-admin/${item.id}`}>
+                  <Link href={`/permintaan-desain-designer/${item.id}`}>
                     <ExternalLink className="mr-2 h-3.5 w-3.5" />
                     Lihat Detail
                   </Link>

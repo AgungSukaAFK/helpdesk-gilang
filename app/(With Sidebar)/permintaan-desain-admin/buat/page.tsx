@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
+import { useRoleGuard } from "@/hooks/use-role-guard";
+import { ROLES } from "@/lib/auth/roles";
 
 // REVISI: Menambahkan 'project' ke interface
 export interface PermintaanDesain {
@@ -26,8 +28,13 @@ export interface PermintaanDesain {
   rating: string;
   review: string;
   requester: string;
-  admin: string;
+  assigned_designer: string;
   files: File[];
+  rating_numeric?: number | null;
+  completed_at?: string | null;
+  skor_ketepatan_waktu?: number | null;
+  skor_kualitas?: number | null;
+  skor_kpi_akhir?: number | null;
 }
 
 interface File {
@@ -64,6 +71,7 @@ const dataProject: ComboboxData = [
 ];
 
 export default function BuatPermintaanDesainPage() {
+  useRoleGuard([ROLES.ADMIN]);
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [alertMessage, setAlertMessage] = useState<string>("");
@@ -111,7 +119,7 @@ export default function BuatPermintaanDesainPage() {
       }
 
       // REVISI: Menambahkan 'project' ke data yang akan di-insert
-      const data: Omit<PermintaanDesain, "id" | "created_at" | "admin"> = {
+      const data: Omit<PermintaanDesain, "id" | "created_at" | "assigned_designer"> = {
         departemen,
         deskripsi,
         judul,

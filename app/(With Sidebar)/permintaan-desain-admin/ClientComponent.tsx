@@ -26,14 +26,20 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx"; // Impor library Excel
+import { StatusBadge } from "@/components/status-badge";
+import { useRoleGuard } from "@/hooks/use-role-guard";
+import { ROLES } from "@/lib/auth/roles";
 
 // Definisikan tipe data untuk konsistensi
 interface Permintaan {
   id: string;
   judul: string;
-  status: "PROGRESS" | "REVISION" | "REVIEW" | "DONE";
+  status: string;
   due_date: string;
   created_at: string;
+  departemen?: string | null;
+  assigned_designer?: string | null;
+  designer_name?: string;
 }
 
 // Tipe data untuk ekspor Excel yang lebih lengkap
@@ -60,6 +66,9 @@ export function PermintaanAdminClientContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Guard: halaman monitoring hanya untuk admin.
+  useRoleGuard([ROLES.ADMIN]);
+
   // State
   const [permintaanList, setPermintaanList] = useState<Permintaan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +80,8 @@ export function PermintaanAdminClientContent() {
   const currentPage = Number(searchParams.get("page") || "1");
   const searchTerm = searchParams.get("search") || "";
   const statusFilter = searchParams.get("status") || "";
+  const departemenFilter = searchParams.get("departemen") || "";
+  const assignFilter = searchParams.get("assign") || ""; // "assigned" | "unassigned"
   const startDate = searchParams.get("startDate") || "";
   const endDate = searchParams.get("endDate") || "";
   const limit = Number(searchParams.get("limit") || 10);
@@ -107,10 +118,18 @@ export function PermintaanAdminClientContent() {
 
       let query = s
         .from("permintaan")
-        .select(`id, judul, status, due_date, created_at`, { count: "exact" });
+        .select(
+          `id, judul, status, due_date, created_at, departemen, assigned_designer`,
+          { count: "exact" }
+        );
 
       if (searchTerm) query = query.ilike("judul", `%${searchTerm}%`);
       if (statusFilter) query = query.eq("status", statusFilter);
+      if (departemenFilter) query = query.eq("departemen", departemenFilter);
+      if (assignFilter === "assigned")
+        query = query.not("assigned_designer", "is", null);
+      if (assignFilter === "unassigned")
+        query = query.is("assigned_designer", null);
       if (startDate) query = query.gte("created_at", startDate);
       if (endDate) query = query.lte("created_at", `${endDate} 23:59:59`);
 
@@ -121,14 +140,47 @@ export function PermintaanAdminClientContent() {
       if (error) {
         toast.error("Gagal mengambil data: " + error.message);
         setPermintaanList([]);
-      } else {
-        setPermintaanList((data as Permintaan[]) || []);
-        setTotalItems(count || 0);
+        setLoading(false);
+        return;
       }
+
+      let rows = (data as Permintaan[]) || [];
+
+      // Resolusi nama desainer (assigned_designer = uuid).
+      const designerIds = [
+        ...new Set(rows.map((r) => r.assigned_designer).filter(Boolean)),
+      ] as string[];
+      if (designerIds.length > 0) {
+        const { data: profiles } = await s
+          .from("user_profiles")
+          .select("id, name")
+          .in("id", designerIds);
+        const nameMap: Record<string, string> = {};
+        profiles?.forEach((p) => (nameMap[p.id] = p.name));
+        rows = rows.map((r) => ({
+          ...r,
+          designer_name: r.assigned_designer
+            ? nameMap[r.assigned_designer] || "..."
+            : undefined,
+        }));
+      }
+
+      setPermintaanList(rows);
+      setTotalItems(count || 0);
       setLoading(false);
     }
     fetchPermintaan();
-  }, [s, currentPage, searchTerm, statusFilter, startDate, endDate, limit]);
+  }, [
+    s,
+    currentPage,
+    searchTerm,
+    statusFilter,
+    departemenFilter,
+    assignFilter,
+    startDate,
+    endDate,
+    limit,
+  ]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -282,12 +334,43 @@ export function PermintaanAdminClientContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="TO DO">To Do</SelectItem>
                   <SelectItem value="PROGRESS">Progress</SelectItem>
                   <SelectItem value="REVISION">Revision</SelectItem>
                   <SelectItem value="REVIEW">Review</SelectItem>
                   <SelectItem value="DONE">Done</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Penanganan</label>
+              <Select
+                onValueChange={(value) =>
+                  handleFilterChange({
+                    assign: value === "all" ? undefined : value,
+                  })
+                }
+                defaultValue={assignFilter || "all"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="assigned">Sudah diambil desainer</SelectItem>
+                  <SelectItem value="unassigned">Belum diambil</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Departemen</label>
+              <Input
+                placeholder="Filter departemen..."
+                defaultValue={departemenFilter}
+                onChange={(e) =>
+                  handleFilterChange({ departemen: e.target.value || undefined })
+                }
+              />
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium">Dari Tanggal</label>
@@ -328,6 +411,8 @@ export function PermintaanAdminClientContent() {
             <TableRow>
               <TableHead className="w-[50px]">No</TableHead>
               <TableHead>Judul</TableHead>
+              <TableHead>Departemen</TableHead>
+              <TableHead>Desainer</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
@@ -336,7 +421,7 @@ export function PermintaanAdminClientContent() {
           <TableBody>
             {loading || isPending ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center h-24">
+                <TableCell colSpan={7} className="text-center h-24">
                   <div className="flex justify-center items-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Memuat data...
@@ -352,10 +437,16 @@ export function PermintaanAdminClientContent() {
                   <TableCell className="font-semibold">
                     {permintaan.judul}
                   </TableCell>
+                  <TableCell>{permintaan.departemen || "-"}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(permintaan.status)}>
-                      {permintaan.status}
-                    </Badge>
+                    {permintaan.designer_name || (
+                      <span className="text-muted-foreground italic text-xs">
+                        Belum diambil
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={permintaan.status} />
                   </TableCell>
                   <TableCell>
                     {new Date(permintaan.due_date).toLocaleDateString("id-ID", {
@@ -375,7 +466,7 @@ export function PermintaanAdminClientContent() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center h-24">
+                <TableCell colSpan={7} className="text-center h-24">
                   Tidak ada permintaan yang ditemukan.
                 </TableCell>
               </TableRow>

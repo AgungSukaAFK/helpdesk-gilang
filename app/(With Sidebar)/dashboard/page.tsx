@@ -23,8 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/status-badge";
+import { isAdmin, isDesigner, normalizeRole } from "@/lib/auth/roles";
 
 // Icons
 import {
@@ -54,12 +55,14 @@ interface DashboardStats {
   selesai?: number;
 
   rataRataRating: number | null;
+  rataRataWaktuPengerjaan?: number | null;
+  rataRataSkorKPI?: number | null;
 }
 
 interface PermintaanTerbaru {
   id: string;
   judul: string;
-  admin: string;
+  assigned_designer: string;
   requester: string;
   project: string;
   created_at: Date;
@@ -103,8 +106,10 @@ export default function DashboardPage() {
           .eq("id", user.id)
           .single();
 
-        const userRole = userProfile?.role || "user";
+        const userRole = normalizeRole(userProfile?.role);
         setRole(userRole);
+        const designerView = isDesigner(userRole);
+        const adminView = isAdmin(userRole);
 
         // 2. Fetch Stats berdasarkan Role
         let statsData: DashboardStats = {
@@ -116,6 +121,13 @@ export default function DashboardPage() {
         const now = new Date();
 
         // Base Query Helper
+        // Scope data sesuai role: requester -> miliknya, designer -> yang ia tangani, admin -> global.
+        const scope = (query: any) => {
+          if (designerView) return query.eq("assigned_designer", user.id);
+          if (!adminView) return query.eq("requester", user.id);
+          return query;
+        };
+
         const getCount = async (
           status: string,
           filter?: (query: any) => any,
@@ -124,9 +136,7 @@ export default function DashboardPage() {
             .from("permintaan")
             .select("*", { count: "exact", head: true })
             .eq("status", status);
-          if (userRole !== "admin") {
-            query = query.eq("requester", user.id);
-          }
+          query = scope(query);
           if (filter) {
             query = filter(query);
           }
@@ -135,8 +145,18 @@ export default function DashboardPage() {
           return count || 0;
         };
 
+        // Jumlah tiket di antrean terbuka (untuk kartu "Baru" milik desainer).
+        const getQueueCount = async () => {
+          const { count } = await s
+            .from("permintaan")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "TO DO")
+            .is("assigned_designer", null);
+          return count || 0;
+        };
+
         // Parallel Requests for Stats
-        if (userRole === "admin") {
+        if (adminView) {
           const [
             baru,
             progress,
@@ -173,24 +193,27 @@ export default function DashboardPage() {
             selesaiMingguIni: doneWeek,
             selesaiBulanIni: doneMonth,
             rataRataRating: ratingRes.data?.rataRataRating || 0,
+            rataRataWaktuPengerjaan: ratingRes.data?.rataRataWaktuPengerjaan ?? null,
+            rataRataSkorKPI: ratingRes.data?.rataRataSkorKPI ?? null,
           };
         } else {
-          // Non-Admin (User)
-          const [baru, progress, revisi, selesai, ratingRes] =
-            await Promise.all([
-              getCount("TO DO"),
-              getCount("PROGRESS"),
-              getCount("REVISION"),
-              getCount("DONE"),
-              s.rpc("get_dashboard_stats"), // RPC mungkin perlu disesuaikan jika ingin rating spesifik user, tapi untuk rata-rata global gapapa
-            ]);
+          // Requester atau Designer
+          const [progress, revisi, selesai] = await Promise.all([
+            getCount("PROGRESS"),
+            getCount("REVISION"),
+            getCount("DONE"),
+          ]);
+          // "Baru": requester = TO DO miliknya; designer = antrean terbuka.
+          const baru = designerView
+            ? await getQueueCount()
+            : await getCount("TO DO");
 
           statsData = {
             baru,
             sedangDikerjakan: progress,
             revisi,
             selesai,
-            rataRataRating: 0, // User biasanya tidak butuh lihat rata-rata rating kerjanya sendiri secara global
+            rataRataRating: 0,
           };
         }
 
@@ -201,34 +224,31 @@ export default function DashboardPage() {
         // Kita pakai default RPC untuk Admin, dan skip/kosongkan untuk User jika privasi diperlukan.
         // Disini saya tampilkan global trend untuk admin, kosong untuk user (opsional).
 
-        if (userRole === "admin") {
+        if (adminView) {
           const { data: trendData } = await s.rpc("get_daily_request_trend", {
             days_limit: 30,
           });
           setTrenHarian(trendData || []);
         }
 
-        // Fetch Terbaru
+        // Fetch Terbaru (scoped sesuai role)
         let queryTerbaru = s
           .from("permintaan")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(5);
 
-        if (userRole !== "admin") {
-          queryTerbaru = queryTerbaru.eq("requester", user.id);
-        }
+        queryTerbaru = scope(queryTerbaru);
 
         const { data: terbaruData, error: terbaruError } = await queryTerbaru;
         if (terbaruError) throw terbaruError;
 
         // Map User Names
         if (terbaruData && terbaruData.length > 0) {
-          let userIds = terbaruData.map((req) => req.requester);
-          userIds = [
-            ...userIds,
-            terbaruData.map((req) => req.admin).filter(Boolean),
-          ];
+          const userIds = [
+            ...terbaruData.map((req) => req.requester),
+            ...terbaruData.map((req) => req.assigned_designer),
+          ].filter(Boolean);
 
           const { data: usersData } = await s
             .from("user_profiles")
@@ -243,7 +263,7 @@ export default function DashboardPage() {
           const finalTerbaru = terbaruData.map((req) => ({
             ...req,
             requester: idToNameMap[req.requester] || "User Tidak Dikenal",
-            admin: idToNameMap[req.admin] || "-",
+            assigned_designer: idToNameMap[req.assigned_designer] || "-",
           }));
           setPermintaanTerbaru(finalTerbaru);
         } else {
@@ -283,7 +303,7 @@ export default function DashboardPage() {
                 <TableHead>Tanggal permintaan</TableHead>
                 <TableHead>Due date</TableHead>
                 <TableHead>Peminta</TableHead>
-                <TableHead>Admin</TableHead>
+                <TableHead>Desainer</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -331,19 +351,23 @@ export default function DashboardPage() {
                       )}
                     </TableCell>
                     <TableCell>{req.requester}</TableCell>
-                    <TableCell>{req.admin || "-"}</TableCell>{" "}
+                    <TableCell>{req.assigned_designer || "-"}</TableCell>{" "}
                     <TableCell>
-                      <Badge
-                        variant={
-                          req.status === "DONE" ? "default" : "secondary"
-                        }
-                      >
-                        {req.status}
-                      </Badge>
+                      <StatusBadge status={req.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" asChild>
-                        <a href={`/permintaan-desain/${req.id}`}>Lihat</a>
+                        <a
+                          href={
+                            role === "admin"
+                              ? `/permintaan-desain-admin/${req.id}`
+                              : role === "designer"
+                                ? `/permintaan-desain-designer/${req.id}`
+                                : `/permintaan-desain/${req.id}`
+                          }
+                        >
+                          Lihat
+                        </a>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -495,7 +519,44 @@ export default function DashboardPage() {
           <p className="text-4xl font-bold">
             {loading
               ? renderLoading()
-              : `${stats?.rataRataRating?.toFixed(1) ?? "N/A"} / 10`}
+              : `${stats?.rataRataRating?.toFixed(1) ?? "N/A"} / 5`}
+          </p>
+        </Content>
+      )}
+
+      {/* SECTION: KPI Agregat (Admin) */}
+      {role === "admin" && (
+        <Content
+          size="xs"
+          title="Rata-rata Skor KPI"
+          description="AVG skor_kpi_akhir tiket selesai"
+          cardAction={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          className="mt-6"
+        >
+          <p className="text-3xl font-bold">
+            {loading
+              ? renderLoading()
+              : stats?.rataRataSkorKPI != null
+                ? Number(stats.rataRataSkorKPI).toFixed(1)
+                : "N/A"}
+          </p>
+        </Content>
+      )}
+
+      {role === "admin" && (
+        <Content
+          size="xs"
+          title="Rata-rata Waktu Pengerjaan"
+          description="Dari diambil s/d selesai"
+          cardAction={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
+          className="mt-6"
+        >
+          <p className="text-3xl font-bold">
+            {loading
+              ? renderLoading()
+              : stats?.rataRataWaktuPengerjaan != null
+                ? `${Number(stats.rataRataWaktuPengerjaan).toFixed(1)} hari`
+                : "N/A"}
           </p>
         </Content>
       )}

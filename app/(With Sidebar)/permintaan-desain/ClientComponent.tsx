@@ -39,6 +39,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx"; // Pastikan install xlsx: npm install xlsx
+import { isRequester, normalizeRole } from "@/lib/auth/roles";
 
 interface Permintaan {
   id: string;
@@ -49,8 +50,8 @@ interface Permintaan {
   created_at: string;
   requester?: string;
   requester_name?: string; // Nama Peminta (Untuk Admin)
-  admin?: string | null;
-  admin_name?: string; // Nama Desainer
+  assigned_designer?: string | null;
+  designer_name?: string; // Nama Desainer
   departemen?: string;
   deskripsi?: string;
 }
@@ -86,25 +87,30 @@ function PermintaanList() {
   const [startDateInput, setStartDateInput] = useState(startDate);
   const [endDateInput, setEndDateInput] = useState(endDate);
 
-  // 1. Cek User & Role
+  // 1. Cek User & Role (halaman ini khusus requester)
   useEffect(() => {
     async function initUser() {
       const {
         data: { user },
       } = await s.auth.getUser();
       if (user) {
-        setCurrentUser(user);
         // Cek Role
         const { data: profile } = await s
-          .from("user_profiles") // Sesuaikan nama tabel profile kamu
+          .from("user_profiles")
           .select("role")
           .eq("id", user.id)
           .single();
-        setUserRole(profile?.role || "user");
+        const role = normalizeRole(profile?.role);
+        if (!isRequester(role)) {
+          router.replace("/dashboard");
+          return;
+        }
+        setCurrentUser(user);
+        setUserRole(role);
       }
     }
     initUser();
-  }, [s]);
+  }, [s, router]);
 
   // 2. Query Data (Cerdas: Admin vs User)
   useEffect(() => {
@@ -148,7 +154,7 @@ function PermintaanList() {
       const userIdsToFetch = new Set<string>();
       formattedData.forEach((item) => {
         if (item.requester) userIdsToFetch.add(item.requester); // Untuk Admin lihat siapa yg minta
-        if (item.admin) userIdsToFetch.add(item.admin); // Untuk lihat desainer
+        if (item.assigned_designer) userIdsToFetch.add(item.assigned_designer); // Untuk lihat desainer
       });
 
       if (userIdsToFetch.size > 0) {
@@ -164,7 +170,9 @@ function PermintaanList() {
         formattedData = formattedData.map((item) => ({
           ...item,
           requester_name: item.requester ? nameMap[item.requester] : "Unknown",
-          admin_name: item.admin ? nameMap[item.admin] : "-",
+          designer_name: item.assigned_designer
+            ? nameMap[item.assigned_designer]
+            : "-",
         }));
       }
 
@@ -408,8 +416,8 @@ function PermintaanList() {
 
                   {/* Kolom Desainer */}
                   <TableCell>
-                    {item.admin_name ||
-                      (item.admin ? (
+                    {item.designer_name ||
+                      (item.assigned_designer ? (
                         "..."
                       ) : (
                         <span className="text-muted-foreground italic text-xs">

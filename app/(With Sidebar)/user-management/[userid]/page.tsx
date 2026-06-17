@@ -23,8 +23,9 @@ type UserWithProfile = {
 };
 
 const dataRole: ComboboxData = [
+  { label: "Requester", value: "requester" },
+  { label: "Desainer", value: "designer" },
   { label: "Admin", value: "admin" },
-  { label: "User", value: "user" },
 ];
 
 export default function EditUserPage({

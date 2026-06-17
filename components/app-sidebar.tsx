@@ -13,81 +13,54 @@ import {
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "./nav-user";
 import {
-  GalleryVerticalEnd,
   Bot,
   LayoutDashboard,
   FileBox,
   BookOpen,
   Info,
   Clock,
+  ListTodo,
+  ClipboardList,
+  Eye,
+  BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
+import { ROLES, normalizeRole } from "@/lib/auth/roles";
 
-const data = {
-  teams: [
-    {
-      name: "Lourdes Autoparts",
-      logo: GalleryVerticalEnd,
-      plan: "Versi 1.0.0",
-    },
-  ],
-  navAdmin: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Permintaan Desain",
-      url: "/permintaan-desain",
-      icon: FileBox,
-    },
-    {
-      title: "Riwayat Pengerjaan",
-      url: "/riwayat-pengerjaan",
-      icon: Clock,
-    },
-    {
-      title: "User Management",
-      url: "/user-management",
-      icon: Bot,
-    },
-  ],
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Permintaan Desain",
-      url: "/permintaan-desain",
-      icon: FileBox,
-    },
-    {
-      title: "Riwayat",
-      url: "/riwayat",
-      icon: Clock,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Dokumentasi",
-      url: "/dokumentasi",
-      icon: BookOpen,
-    },
-    // {
-    //   title: "Feedback",
-    //   url: "/feedback",
-    //   icon: MessageSquareShare,
-    // },
-    {
-      title: "Tentang App",
-      url: "/tentang-app",
-      icon: Info,
-    },
-  ],
-};
+type NavItem = { title: string; url: string; icon?: LucideIcon };
+
+// Menu utama per role — satu sumber kebenaran, dikonsumsi satu komponen NavMain generik.
+function getNavItemsByRole(role: string | null | undefined): NavItem[] {
+  switch (normalizeRole(role)) {
+    case ROLES.ADMIN:
+      return [
+        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+        { title: "Monitoring Permintaan", url: "/permintaan-desain-admin", icon: Eye },
+        { title: "Laporan KPI", url: "/laporan-kpi", icon: BarChart3 },
+        { title: "User Management", url: "/user-management", icon: Bot },
+      ];
+    case ROLES.DESIGNER:
+      return [
+        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+        { title: "Antrean Tugas", url: "/permintaan-desain-designer", icon: ListTodo },
+        { title: "Tugas Saya", url: "/permintaan-desain-designer/tugas-saya", icon: ClipboardList },
+        { title: "Riwayat Pengerjaan", url: "/riwayat-pengerjaan", icon: Clock },
+      ];
+    case ROLES.REQUESTER:
+    default:
+      return [
+        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+        { title: "Permintaan Desain", url: "/permintaan-desain", icon: FileBox },
+        { title: "Riwayat", url: "/riwayat", icon: Clock },
+      ];
+  }
+}
+
+const navSecondary: NavItem[] = [
+  { title: "Dokumentasi", url: "/dokumentasi", icon: BookOpen },
+  { title: "Tentang App", url: "/tentang-app", icon: Info },
+];
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const currentPath = usePathname();
@@ -111,7 +84,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     getUser();
   }, [supabase]);
 
-  const markActive = (items: typeof data.navMain) =>
+  const markActive = (items: NavItem[]) =>
     items.map((item) => ({
       ...item,
       isActive: currentPath.includes(item.url),
@@ -131,12 +104,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        {profile?.role === "admin" ? (
-          <NavMain label="Menu" items={markActive(data.navAdmin)} />
-        ) : (
-          <NavMain label="Menu" items={markActive(data.navMain)} />
-        )}
-        <NavMain label="About" items={markActive(data.navSecondary)} />
+        <NavMain label="Menu" items={markActive(getNavItemsByRole(profile?.role))} />
+        <NavMain label="About" items={markActive(navSecondary)} />
       </SidebarContent>
 
       <SidebarFooter>

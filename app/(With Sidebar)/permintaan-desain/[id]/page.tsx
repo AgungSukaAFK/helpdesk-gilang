@@ -70,6 +70,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { isRequester } from "@/lib/auth/roles";
 
 // --- TIPE DATA ---
 
@@ -104,10 +105,11 @@ interface PermintaanDetail {
   created_at: string;
   requester: string;
   requester_data?: UserProfile;
-  admin?: string;
-  admin_data?: UserProfile;
+  assigned_designer?: string;
+  designer_data?: UserProfile;
   files?: FileItem[] | null;
   rating?: string;
+  rating_numeric?: number;
   review?: string;
   departemen?: string;
 }
@@ -131,7 +133,6 @@ export default function DetailPermintaanPage() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   // State Revisi & Review (User)
   const [isRevisionOpen, setIsRevisionOpen] = useState(false);
@@ -139,10 +140,6 @@ export default function DetailPermintaanPage() {
   const [isFinishOpen, setIsFinishOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
-
-  // State Admin Guard (Konfirmasi ubah status DONE)
-  const [showStatusAlert, setShowStatusAlert] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<string>("");
 
   // State Diskusi
   const [komentar, setKomentar] = useState<KomentarItem[]>([]);
@@ -183,16 +180,16 @@ export default function DetailPermintaanPage() {
       if (error) throw error;
 
       // 3. Fetch Relations
-      let adminInfo = null;
+      let designerInfo = null;
       let requesterInfo = null;
 
-      if (requestData.admin) {
+      if (requestData.assigned_designer) {
         const { data: a } = await s
           .from("user_profiles")
           .select("name, email, role")
-          .eq("id", requestData.admin)
+          .eq("id", requestData.assigned_designer)
           .single();
-        if (a) adminInfo = a;
+        if (a) designerInfo = a;
       }
 
       if (requestData.requester) {
@@ -206,7 +203,7 @@ export default function DetailPermintaanPage() {
 
       setData({
         ...requestData,
-        admin_data: adminInfo || undefined,
+        designer_data: designerInfo || undefined,
         requester_data: requesterInfo || undefined,
         files: Array.isArray(requestData.files) ? requestData.files : [],
       });
@@ -256,6 +253,13 @@ export default function DetailPermintaanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, s, router]);
 
+  // Guard: halaman ini khusus requester. Admin -> monitoring, Desainer -> route designer.
+  useEffect(() => {
+    if (currentUser && !isRequester(currentUser.role)) {
+      router.replace("/dashboard");
+    }
+  }, [currentUser, router]);
+
   // --- QUICK REFRESH HANDLERS ---
   const handleRefreshData = async () => {
     const toastId = toast.loading("Menyegarkan data...");
@@ -269,96 +273,7 @@ export default function DetailPermintaanPage() {
     toast.success("Chat diperbarui");
   };
 
-  // --- HANDLERS ADMIN ---
-
-  const handleAmbilPermintaan = async () => {
-    if (!currentUser || !data) return;
-    setIsSubmitting(true);
-    try {
-      const { error } = await s
-        .from("permintaan")
-        .update({
-          admin: currentUser.id,
-          status: "PROGRESS",
-        })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Berhasil mengambil permintaan!");
-      setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              admin: currentUser.id,
-              status: "PROGRESS",
-              admin_data: currentUser,
-            }
-          : null,
-      );
-    } catch (e: any) {
-      toast.error("Gagal: " + e.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Logic: Jika status sebelumnya DONE, minta konfirmasi dulu
-  const handleStatusChangeRequest = (val: string) => {
-    if (data?.status === "DONE") {
-      setPendingStatus(val);
-      setShowStatusAlert(true);
-    } else {
-      executeStatusChange(val);
-    }
-  };
-
-  const executeStatusChange = async (val: string) => {
-    if (!data) return;
-    setIsSubmitting(true);
-    try {
-      const { error } = await s
-        .from("permintaan")
-        .update({ status: val })
-        .eq("id", id);
-
-      if (error) throw error;
-      toast.success(`Status diubah menjadi ${val}`);
-      setData((prev) => (prev ? { ...prev, status: val } : null));
-    } catch (e: any) {
-      toast.error("Gagal update status: " + e.message);
-    } finally {
-      setIsSubmitting(false);
-      setShowStatusAlert(false);
-    }
-  };
-
-  const handleDeleteFile = async (fileToDelete: FileItem) => {
-    if (!data || !window.confirm(`Hapus file ${fileToDelete.name}?`)) return;
-
-    setIsDeleting(fileToDelete.name);
-    try {
-      const updatedFiles = (data.files || []).filter(
-        (f) => f.name !== fileToDelete.name,
-      );
-
-      const { error } = await s
-        .from("permintaan")
-        .update({ files: updatedFiles })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("File dihapus.");
-      setData((prev) => (prev ? { ...prev, files: updatedFiles } : null));
-    } catch (e: any) {
-      toast.error("Gagal hapus file: " + e.message);
-    } finally {
-      setIsDeleting(null);
-    }
-  };
-
-  // --- HANDLERS SHARED (User & Admin) ---
+  // --- HANDLERS SHARED ---
 
   const handleDownloadFile = (file: FileItem) => {
     window.open(file.url, "_blank");
@@ -452,7 +367,7 @@ export default function DetailPermintaanPage() {
       .from("permintaan")
       .update({
         status: "DONE",
-        rating: rating.toString(),
+        rating_numeric: rating,
         review: reviewText,
       })
       .eq("id", id);
@@ -465,7 +380,7 @@ export default function DetailPermintaanPage() {
           ? {
               ...prev,
               status: "DONE",
-              rating: rating.toString(),
+              rating_numeric: rating,
               review: reviewText,
             }
           : null,
@@ -548,7 +463,6 @@ export default function DetailPermintaanPage() {
 
   if (!data) return <Content title="404" description="Data tidak ditemukan." />;
 
-  const isAdmin = currentUser?.role === "admin";
   const isReviewStatus = data.status === "REVIEW";
   const isDoneStatus = data.status === "DONE";
   const isRevisionStatus = data.status === "REVISION";
@@ -576,35 +490,6 @@ export default function DetailPermintaanPage() {
         </div>
       }
     >
-      {/* ADMIN ALERT DIALOG: Ubah Status dari DONE */}
-      <AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ubah Status Selesai?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Permintaan ini sudah ditandai <b>SELESAI (DONE)</b>. Mengubah
-              status akan membuka kembali tiket ini. Apakah Anda yakin ingin
-              mengubahnya menjadi <b>{pendingStatus}</b>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setShowStatusAlert(false);
-                setPendingStatus("");
-              }}
-            >
-              Batal
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => executeStatusChange(pendingStatus)}
-            >
-              Ya, Ubah Status
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <div className="grid gap-6 md:grid-cols-3">
         {/* KOLOM KIRI: Detail, Files, Chat */}
         <div className="md:col-span-2 space-y-6">
@@ -641,11 +526,13 @@ export default function DetailPermintaanPage() {
             <Separator />
 
             {/* Jika DONE, Tampilkan Review */}
-            {isDoneStatus && data.rating && (
+            {isDoneStatus && data.rating_numeric && (
               <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 p-4 rounded-md space-y-2">
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-bold text-lg">{data.rating} / 5</span>
+                  <span className="font-bold text-lg">
+                    {data.rating_numeric} / 5
+                  </span>
                   <span className="text-muted-foreground text-sm ml-1">
                     • Penilaian User
                   </span>
@@ -699,7 +586,7 @@ export default function DetailPermintaanPage() {
                       ) : (
                         <UploadCloud className="h-3 w-3 mr-2" />
                       )}
-                      {isAdmin ? "Upload Hasil/File" : "Upload Tambahan"}
+                      Upload Tambahan
                     </label>
                   </Button>
                 </div>
@@ -734,21 +621,6 @@ export default function DetailPermintaanPage() {
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
-                              {isAdmin && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteFile(f)}
-                                  disabled={isDeleting === f.name}
-                                >
-                                  {isDeleting === f.name ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -874,8 +746,8 @@ export default function DetailPermintaanPage() {
             </div>
           </div>
 
-          {/* USER ACTION AREA (Only for Requester when REVIEW) */}
-          {!isAdmin && isReviewStatus && (
+          {/* USER ACTION AREA (Requester saat status REVIEW) */}
+          {isReviewStatus && (
             <div className="border rounded-lg p-6 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-bottom-5">
               <div>
                 <h3 className="font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
@@ -982,60 +854,6 @@ export default function DetailPermintaanPage() {
 
         {/* KOLOM KANAN: Sidebar Info */}
         <div className="space-y-6">
-          {/* ADMIN CONTROL PANEL */}
-          {isAdmin && (
-            <div className="border rounded-lg p-5 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="h-5 w-5 text-indigo-600" />
-                <h3 className="font-bold text-sm uppercase tracking-wider text-indigo-900 dark:text-indigo-300">
-                  Admin Control
-                </h3>
-              </div>
-
-              {/* Tombol Ambil Job */}
-              {!data.admin && data.status === "TO DO" && (
-                <div className="p-3 bg-white dark:bg-slate-800 rounded border text-center space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    Permintaan ini belum ada yang mengerjakan.
-                  </p>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    onClick={handleAmbilPermintaan}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="animate-spin h-4 w-4" />
-                    ) : (
-                      "Ambil Permintaan Ini"
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Ganti Status Manual */}
-              <div className="space-y-2">
-                <Label className="text-xs">Update Status</Label>
-                <Select
-                  value={data.status}
-                  onValueChange={handleStatusChangeRequest} // Menggunakan handler baru (ada konfirmasi)
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Pilih Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
           {/* INFO PROJECT */}
           <div className="border rounded-lg p-5 bg-card shadow-sm space-y-5 sticky top-6">
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
@@ -1092,13 +910,13 @@ export default function DetailPermintaanPage() {
               <ShieldCheck className="h-5 w-5 text-primary" />
               <div>
                 <p className="text-xs text-muted-foreground">Desainer (PIC)</p>
-                {data.admin_data ? (
+                {data.designer_data ? (
                   <div className="mt-1">
                     <p className="font-medium text-sm">
-                      {data.admin_data.name}
+                      {data.designer_data.name}
                     </p>
                     <Badge variant="outline" className="text-[10px] px-1 h-5">
-                      Admin
+                      Desainer
                     </Badge>
                   </div>
                 ) : (
