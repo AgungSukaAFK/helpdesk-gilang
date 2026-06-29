@@ -93,13 +93,18 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div>
+        <div className="flex items-center gap-2 px-1 py-1.5">
           <Image
-            src={"/lourdes.png"}
-            width={500}
-            height={500}
-            alt="Lourdes Autoparts"
+            src={"/gis.png"}
+            width={512}
+            height={512}
+            alt="PT. Global Inti Sejati"
+            className="size-9 shrink-0 object-contain"
           />
+          <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-semibold">PT. Global Inti Sejati</span>
+            <span className="text-xs text-muted-foreground">Helpdesk Desain</span>
+          </div>
         </div>
       </SidebarHeader>
 

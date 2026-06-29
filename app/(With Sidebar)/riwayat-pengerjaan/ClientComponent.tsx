@@ -37,7 +37,7 @@ interface RiwayatItem {
   id: string;
   judul: string;
   due_date: string;
-  rating: number | null;
+  rating_numeric: number | null;
   review: string | null;
   requester: string | null;
   project: string | null;
@@ -318,7 +318,7 @@ export function RiwayatAdminClientContent() {
 
               <CardContent className="flex-grow pt-0 pb-4">
                 {/* Bagian Rating */}
-                {item.rating ? (
+                {item.rating_numeric ? (
                   <div className="bg-yellow-50/50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/40 mt-1">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-yellow-700 dark:text-yellow-500 uppercase tracking-wide">
@@ -327,7 +327,7 @@ export function RiwayatAdminClientContent() {
                       <div className="flex items-center gap-1 bg-white dark:bg-black/20 px-1.5 py-0.5 rounded-full border border-yellow-200 dark:border-yellow-800">
                         <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
                         <span className="font-bold text-xs text-yellow-700 dark:text-yellow-400">
-                          {item.rating}
+                          {item.rating_numeric}
                         </span>
                       </div>
                     </div>

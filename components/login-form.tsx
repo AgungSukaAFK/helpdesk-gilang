@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -49,11 +50,27 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <Image
+          src="/gis.png"
+          width={512}
+          height={512}
+          alt="PT. Global Inti Sejati"
+          className="size-16 object-contain"
+          priority
+        />
+        <div>
+          <p className="text-base font-semibold leading-tight">
+            PT. Global Inti Sejati
+          </p>
+          <p className="text-sm text-muted-foreground">Helpdesk Desain</p>
+        </div>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Masuk dengan akun Anda untuk mengakses Helpdesk Desain
           </CardDescription>
         </CardHeader>
         <CardContent>

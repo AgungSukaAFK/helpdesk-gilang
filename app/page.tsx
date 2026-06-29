@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, Palette, Rocket, Users, ArrowRight } from "lucide-react"; // Menambahkan ArrowRight
+import { Check, Rocket, Users, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
@@ -18,8 +18,20 @@ export default function LandingPageV3() {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <a href="#" className="flex items-center gap-2">
-            <Palette className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold">DesignDesk</span>
+            <Image
+              src="/gis.png"
+              width={512}
+              height={512}
+              alt="PT. Global Inti Sejati"
+              className="h-8 w-8 object-contain"
+              priority
+            />
+            <div className="flex flex-col leading-tight">
+              <span className="text-base font-bold">PT. Global Inti Sejati</span>
+              <span className="text-xs text-muted-foreground">
+                Helpdesk Desain
+              </span>
+            </div>
           </a>
           <nav className="hidden items-center gap-6 md:flex">
             <a
@@ -62,8 +74,9 @@ export default function LandingPageV3() {
                 </h1>
                 <p className="mt-6 text-lg leading-8 text-muted-foreground">
                   Lelah dengan brief yang berceceran di email dan revisi tanpa
-                  akhir? DesignDesk menyatukan semua permintaan, feedback, dan
-                  file desain Anda di satu tempat yang rapi.
+                  akhir? Helpdesk Desain PT. Global Inti Sejati menyatukan semua
+                  permintaan, feedback, dan file desain Anda di satu tempat yang
+                  rapi.
                 </p>
                 <div className="mt-10 flex items-center gap-4">
                   <Button
@@ -296,8 +309,8 @@ export default function LandingPageV3() {
                 Sudah Siap Bekerja Lebih Cerdas?
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-lg text-primary-foreground/80">
-                Hentikan kebiasaan lama. Coba DesignDesk gratis dan rasakan
-                sendiri perbedaannya dalam kolaborasi tim Anda.
+                Hentikan kebiasaan lama. Rasakan sendiri perbedaannya dalam
+                kolaborasi tim desain PT. Global Inti Sejati.
               </p>
               <div className="mt-8">
                 <Button asChild size="lg" variant="secondary">
@@ -313,7 +326,8 @@ export default function LandingPageV3() {
       <footer className="border-t border-border">
         <div className="container mx-auto flex flex-col items-center justify-between gap-6 px-4 py-8 sm:flex-row">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} DesignDesk. All rights reserved.
+            © {new Date().getFullYear()} PT. Global Inti Sejati. All rights
+            reserved.
           </p>
           <div className="flex gap-6">
             <a

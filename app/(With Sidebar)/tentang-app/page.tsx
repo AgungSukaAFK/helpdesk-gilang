@@ -2,6 +2,7 @@
 
 import { Content } from "@/components/content";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 // Data Developer Placeholder
 // const developers = [
@@ -35,13 +36,34 @@ export default function TentangAppPage() {
   return (
     // Container Grid Utama untuk mengatur tata letak Content
     <>
+      <Content size="lg" title="PT. Global Inti Sejati">
+        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
+          <Image
+            src="/gis.png"
+            width={512}
+            height={512}
+            alt="PT. Global Inti Sejati"
+            className="size-24 shrink-0 object-contain"
+          />
+          <div className="prose prose-stone dark:prose-invert max-w-none">
+            <p>
+              Aplikasi Helpdesk Desain ini dikembangkan dan digunakan oleh{" "}
+              <strong>PT. Global Inti Sejati (GIS)</strong> sebagai sarana
+              internal untuk mengelola seluruh kebutuhan desain perusahaan secara
+              terpusat. Melalui platform ini, GIS berkomitmen menghadirkan alur
+              kerja yang profesional, efisien, dan transparan di setiap proyek.
+            </p>
+          </div>
+        </div>
+      </Content>
+
       <Content size="lg" title="Tentang Aplikasi Helpdesk Desain">
         <div className="prose prose-stone dark:prose-invert max-w-none">
           <p>
-            Selamat datang di Aplikasi Helpdesk Desain! Platform ini dirancang
-            untuk menjembatani komunikasi antara berbagai departemen dengan tim
-            desainer, memastikan setiap permintaan dapat dikelola dengan
-            efisien, transparan, dan terstruktur.
+            Selamat datang di Aplikasi Helpdesk Desain PT. Global Inti Sejati!
+            Platform ini dirancang untuk menjembatani komunikasi antara berbagai
+            departemen dengan tim desainer, memastikan setiap permintaan dapat
+            dikelola dengan efisien, transparan, dan terstruktur.
           </p>
           <p>
             Tujuan utama kami adalah menyederhanakan alur kerja, mulai dari
