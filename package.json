@@ -3,6 +3,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:clean": "npm run clean && next build",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "start": "next start",
     "lint": "next lint"
   },
