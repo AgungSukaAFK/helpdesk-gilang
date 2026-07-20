@@ -1,3 +1,5 @@
+"use client";
+
 import { ChevronsUpDown, LogOut, SquareUserRound } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,7 +21,7 @@ import {
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MyAlertDialog } from "./dialog-confirm";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export function NavUser({
   user,
@@ -33,11 +35,16 @@ export function NavUser({
   const [logoutDialog, setLogoutDialog] = useState<boolean>(false);
 
   const { isMobile } = useSidebar();
+  const router = useRouter();
 
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    redirect("/auth/login");
+    setLogoutDialog(false);
+    // replace() agar halaman terproteksi tidak bisa diakses lewat tombol back,
+    // refresh() untuk membuang cache Server Component milik sesi lama.
+    router.replace("/auth/login");
+    router.refresh();
   }
 
   return (

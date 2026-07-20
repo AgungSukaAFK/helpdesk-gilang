@@ -135,7 +135,7 @@ export default function TugasSayaPage() {
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/permintaan-desain-designer/${item.id}`}>
-                        Kerjakan
+                        {item.status === "DONE" ? "Lihat Detail" : "Kerjakan"}
                       </Link>
                     </Button>
                   </TableCell>

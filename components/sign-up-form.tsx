@@ -40,15 +40,28 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+
+      // Konfirmasi email dilewati: bila Supabase sudah mengembalikan sesi,
+      // user langsung masuk ke dashboard.
+      if (data.session) {
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
+      // Tidak ada sesi -> coba login langsung. Ini berhasil selama opsi
+      // "Confirm email" di Supabase (Authentication > Providers > Email)
+      // dalam keadaan nonaktif.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
-        },
       });
-      if (error) throw error;
-      router.push("/auth/sign-up-success");
+      if (signInError) throw signInError;
+
+      router.push("/dashboard");
+      router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {

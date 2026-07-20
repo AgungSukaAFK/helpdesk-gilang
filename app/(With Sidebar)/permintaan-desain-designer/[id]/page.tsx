@@ -259,7 +259,12 @@ export default function DetailPengerjaanPage({
   if (!data) return <Content title="404" description="Data tidak ditemukan." />;
 
   return (
-    <Content title="Kerjakan Permintaan" size="lg">
+    <Content
+      title={
+        data.status === "DONE" ? "Detail Permintaan" : "Kerjakan Permintaan"
+      }
+      size="lg"
+    >
       <div className="grid gap-6 md:grid-cols-3">
         {/* KIRI: detail + files + chat */}
         <div className="md:col-span-2 space-y-6">

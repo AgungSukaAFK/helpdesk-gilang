@@ -25,7 +25,7 @@ interface RiwayatPermintaan {
   id: string;
   judul: string;
   due_date: string;
-  rating: number;
+  rating: number | null;
   review: string | null;
 }
 
@@ -87,8 +87,7 @@ export function RiwayatClientContent() {
         .from("permintaan")
         .select(`id, judul, due_date, rating, review`, { count: "exact" })
         .eq("requester", user.id)
-        .eq("status", "DONE")
-        .not("rating", "is", null);
+        .eq("status", "DONE");
 
       if (searchTerm) {
         query = query.ilike("judul", `%${searchTerm}%`);
@@ -153,9 +152,20 @@ export function RiwayatClientContent() {
               </CardHeader>
               <CardContent className="flex-grow">
                 <div className="flex items-center gap-2 mb-4">
-                  <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-                  <span className="text-xl font-bold">{item.rating}</span>
-                  <span className="text-muted-foreground">/ 10</span>
+                  {item.rating !== null ? (
+                    <>
+                      <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
+                      <span className="text-xl font-bold">{item.rating}</span>
+                      <span className="text-muted-foreground">/ 10</span>
+                    </>
+                  ) : (
+                    <>
+                      <Star className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Belum dinilai
+                      </span>
+                    </>
+                  )}
                 </div>
                 <blockquote className="border-l-2 pl-4 italic text-sm text-muted-foreground line-clamp-4">
                   {item.review || "Tidak ada review yang diberikan."}
@@ -173,7 +183,7 @@ export function RiwayatClientContent() {
         <div className="text-center h-64 flex flex-col justify-center items-center">
           <h3 className="text-xl font-semibold">Tidak Ada Riwayat</h3>
           <p className="text-muted-foreground mt-2">
-            Anda belum memiliki riwayat permintaan yang selesai dan direview.
+            Anda belum memiliki riwayat permintaan yang selesai.
           </p>
         </div>
       )}
