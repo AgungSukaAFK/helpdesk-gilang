@@ -53,6 +53,17 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {
+    // Route API menjawab dengan JSON, bukan redirect. Bila sesi habis,
+    // fetch() akan mengikuti redirect dan menerima HTML halaman login,
+    // sehingga res.json() di client gagal parse dan pesan errornya
+    // membingungkan. 401 JSON membuat penyebabnya jelas.
+    if (request.nextUrl.pathname.startsWith("/api")) {
+      return NextResponse.json(
+        { error: "Sesi berakhir. Silakan login ulang." },
+        { status: 401 }
+      );
+    }
+
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";

@@ -35,6 +35,9 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState<boolean>(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -125,6 +128,39 @@ export default function ProfilePage() {
     setUpdateSuccess(false);
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password minimal 6 karakter.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Konfirmasi password tidak cocok.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    const supabase = createClient();
+
+    try {
+      // updateUser() mengubah password akun yang sedang login dan sekaligus
+      // memperbarui token sesi ini, jadi user tidak ikut ter-logout.
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) throw error;
+
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Password berhasil diubah.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Gagal mengubah password."
+      );
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <Content size="md" title="Data Profil">
@@ -197,6 +233,47 @@ export default function ProfilePage() {
           )}
         </div>
       </Content>
+      <Content size="md" title="Ubah Password">
+        <p className="text-sm text-muted-foreground">
+          Ubah password akun Anda sendiri. Anda tetap login setelah password
+          diganti.
+        </p>
+
+        <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="new-password">Password Baru</Label>
+            <Input
+              id="new-password"
+              type="password"
+              className="mt-1"
+              placeholder="Minimal 6 karakter"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="confirm-password">Konfirmasi Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              className="mt-1"
+              placeholder="Ulangi password baru"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            onClick={handleChangePassword}
+            disabled={isChangingPassword || !newPassword || !confirmPassword}
+          >
+            {isChangingPassword ? "Menyimpan..." : "Ubah Password"}
+          </Button>
+        </div>
+      </Content>
+
       <Content size="xs">
         <div className="flex justify-between items-center">
           <Label className="text-base font-bold">Pengaturan Tema</Label>

@@ -55,7 +55,6 @@ interface DashboardStats {
   selesai?: number;
 
   rataRataRating: number | null;
-  rataRataWaktuPengerjaan?: number | null;
   rataRataSkorKPI?: number | null;
 }
 
@@ -193,7 +192,6 @@ export default function DashboardPage() {
             selesaiMingguIni: doneWeek,
             selesaiBulanIni: doneMonth,
             rataRataRating: ratingRes.data?.rataRataRating || 0,
-            rataRataWaktuPengerjaan: ratingRes.data?.rataRataWaktuPengerjaan ?? null,
             rataRataSkorKPI: ratingRes.data?.rataRataSkorKPI ?? null,
           };
         } else {
@@ -543,23 +541,6 @@ export default function DashboardPage() {
         </Content>
       )}
 
-      {role === "admin" && (
-        <Content
-          size="xs"
-          title="Rata-rata Waktu Pengerjaan"
-          description="Dari diambil s/d selesai"
-          cardAction={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
-          className="mt-6"
-        >
-          <p className="text-3xl font-bold">
-            {loading
-              ? renderLoading()
-              : stats?.rataRataWaktuPengerjaan != null
-                ? `${Number(stats.rataRataWaktuPengerjaan).toFixed(1)} hari`
-                : "N/A"}
-          </p>
-        </Content>
-      )}
     </>
   );
 }

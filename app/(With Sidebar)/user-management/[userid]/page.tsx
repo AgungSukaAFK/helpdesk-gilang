@@ -45,6 +45,14 @@ export default function EditUserPage({
   const [updateSuccess, setUpdateSuccess] = useState<boolean>(false);
   const router = useRouter();
 
+  // Reset password
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
   const { userid } = React.use(params);
 
   useEffect(() => {
@@ -78,6 +86,18 @@ export default function EditUserPage({
 
     fetchUserData();
   }, [userid, router]);
+
+  useEffect(() => {
+    async function fetchCurrentUser() {
+      const supabase = createClient();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      setCurrentUserId(authUser?.id ?? null);
+    }
+
+    fetchCurrentUser();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -114,6 +134,48 @@ export default function EditUserPage({
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!user) return;
+    setResetError(null);
+    setResetSuccess(false);
+
+    if (currentUserId && currentUserId === user.id) {
+      setResetError(
+        "Tidak bisa mereset password akun sendiri dari sini karena sesi Anda akan berakhir. Gunakan halaman Profil."
+      );
+      return;
+    }
+    if (newPassword.length < 6) {
+      setResetError("Password minimal 6 karakter.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetError("Konfirmasi password tidak cocok.");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, password: newPassword }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal mereset password.");
+
+      setNewPassword("");
+      setConfirmPassword("");
+      setResetSuccess(true);
+    } catch (error: unknown) {
+      setResetError(
+        error instanceof Error ? error.message : "Gagal mereset password."
+      );
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleCancelEdit = () => {
     setEditMode(false);
     if (user) {
@@ -133,6 +195,8 @@ export default function EditUserPage({
       </Content>
     );
   }
+
+  const isSelf = !!currentUserId && currentUserId === user?.id;
 
   return (
     <Content size="md" title={`Edit Profil`}>
@@ -203,6 +267,82 @@ export default function EditUserPage({
             </Button>
           </>
         )}
+      </div>
+
+      <div className="mt-8 border-t pt-6">
+        <h3 className="font-medium">Reset Password</h3>
+
+        {isSelf ? (
+          // Mengganti password sebuah akun mencabut seluruh sesi akun itu.
+          // Kalau admin mereset akunnya sendiri di sini, ia langsung logout.
+          <Alert className="mt-3">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Ini akun Anda sendiri</AlertTitle>
+            <AlertDescription>
+              Reset password dinonaktifkan di halaman ini karena mengganti
+              password akun sendiri akan mengakhiri sesi Anda dan membuat Anda
+              logout. Ubah password Anda lewat halaman Profil.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Password akan diganti untuk akun{" "}
+            <strong className="text-foreground">{user?.email}</strong>. Sampaikan
+            password baru tersebut langsung kepada user yang bersangkutan.
+          </p>
+        )}
+
+        {resetSuccess && (
+          <Alert className="mt-4 bg-green-500 text-white">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Berhasil!</AlertTitle>
+            <AlertDescription>
+              Password untuk {user?.email} berhasil direset.
+            </AlertDescription>
+          </Alert>
+        )}
+        {resetError && (
+          <Alert variant="destructive" className="mt-4">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Gagal!</AlertTitle>
+            <AlertDescription>{resetError}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className={`mt-4 space-y-4 ${isSelf ? "hidden" : ""}`}>
+          <div>
+            <label className="mb-2 block font-medium">Password Baru</label>
+            <Input
+              type="password"
+              placeholder="Minimal 6 karakter"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block font-medium">
+              Konfirmasi Password
+            </label>
+            <Input
+              type="password"
+              placeholder="Ulangi password baru"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className={`mt-4 flex justify-end ${isSelf ? "hidden" : ""}`}>
+          <Button
+            variant="destructive"
+            onClick={handleResetPassword}
+            disabled={
+              isSelf || isResetting || !newPassword || !confirmPassword
+            }
+          >
+            {isResetting ? "Mereset..." : "Reset Password"}
+          </Button>
+        </div>
       </div>
     </Content>
   );

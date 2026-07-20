@@ -25,7 +25,7 @@ interface RiwayatPermintaan {
   id: string;
   judul: string;
   due_date: string;
-  rating: number | null;
+  rating_numeric: number | null;
   review: string | null;
 }
 
@@ -85,7 +85,9 @@ export function RiwayatClientContent() {
 
       let query = s
         .from("permintaan")
-        .select(`id, judul, due_date, rating, review`, { count: "exact" })
+        .select(`id, judul, due_date, rating_numeric, review`, {
+          count: "exact",
+        })
         .eq("requester", user.id)
         .eq("status", "DONE");
 
@@ -152,11 +154,13 @@ export function RiwayatClientContent() {
               </CardHeader>
               <CardContent className="flex-grow">
                 <div className="flex items-center gap-2 mb-4">
-                  {item.rating !== null ? (
+                  {item.rating_numeric !== null ? (
                     <>
                       <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
-                      <span className="text-xl font-bold">{item.rating}</span>
-                      <span className="text-muted-foreground">/ 10</span>
+                      <span className="text-xl font-bold">
+                        {item.rating_numeric}
+                      </span>
+                      <span className="text-muted-foreground">/ 5</span>
                     </>
                   ) : (
                     <>
