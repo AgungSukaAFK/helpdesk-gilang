@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
-import { FormEvent, useState } from "react";
+import { DEPARTMENTS } from "@/lib/constants/departments";
+import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Paperclip, Trash2 } from "lucide-react";
 import {
@@ -46,23 +47,6 @@ interface File {
   name: string;
 }
 
-const dataDepartment: ComboboxData = [
-  { label: "General Affair", value: "General Affair" },
-  { label: "Marketing", value: "Marketing" },
-  { label: "Manufacture", value: "Manufacture" },
-  { label: "HR", value: "HR" },
-  { label: "K3", value: "K3" },
-  { label: "IT", value: "IT" },
-  { label: "Finance", value: "Finance" },
-  { label: "Logistik", value: "Logistik" },
-  { label: "Purchasing", value: "Purchasing" },
-  { label: "Warehouse", value: "Warehouse" },
-  { label: "Service", value: "Service" },
-  { label: "General Manager", value: "General Manager" },
-  { label: "Executive Manager", value: "Executive Manager" },
-  { label: "Boards of Director", value: "Boards of Director" },
-];
-
 const dataProject: ComboboxData = [
   { label: "Desain Poster", value: "Desain Poster" },
   { label: "Desain Logo", value: "Desain Logo" },
@@ -77,6 +61,7 @@ export default function BuatPermintaanDesainPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [departmentLoading, setDepartmentLoading] = useState<boolean>(true);
   const [alertMessage, setAlertMessage] = useState<string>("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [customProject, setCustomProject] = useState<string>("");
@@ -85,6 +70,33 @@ export default function BuatPermintaanDesainPage() {
   const s = createClient();
 
   const { push } = useRouter();
+
+  // Departemen tidak lagi dipilih manual — diambil dari profil user yang
+  // login lalu ditampilkan disabled, supaya selalu konsisten dengan data
+  // departemen pemohon di public.users.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const {
+        data: { user },
+      } = await s.auth.getUser();
+      if (!user) return;
+
+      const { data } = await s
+        .from("users")
+        .select("department")
+        .eq("id", user.id)
+        .single();
+
+      if (!active) return;
+      setSelectedDepartment(data?.department ?? "");
+      setDepartmentLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- FUNGSI UNTUK MENGELOLA LAMPIRAN ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -188,7 +200,6 @@ export default function BuatPermintaanDesainPage() {
       if (insertError) throw insertError;
 
       form.reset();
-      setSelectedDepartment("");
       setSelectedProject("");
       setCustomProject("");
       setUploadedFiles([]); // <-- Reset state lampiran
@@ -263,10 +274,19 @@ export default function BuatPermintaanDesainPage() {
           <div className="flex flex-col gap-2">
             <Label htmlFor="departemen">Departemen</Label>
             <Combobox
-              data={dataDepartment}
+              key={selectedDepartment}
+              data={DEPARTMENTS}
               onChange={handleDepartmentChange}
               defaultValue={selectedDepartment}
+              disabled
             />
+            <p className="text-sm text-muted-foreground">
+              {departmentLoading
+                ? "Memuat departemen..."
+                : selectedDepartment
+                ? "Diambil otomatis dari profil Anda dan tidak dapat diubah."
+                : "Departemen Anda belum diset. Hubungi admin untuk mengaturnya sebelum membuat permintaan."}
+            </p>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="due_date">Due Date</Label>

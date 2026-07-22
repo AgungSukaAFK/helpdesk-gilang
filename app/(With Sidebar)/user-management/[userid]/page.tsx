@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import { Combobox, ComboboxData } from "@/components/combobox";
+import { DEPARTMENTS } from "@/lib/constants/departments";
 
 type Profile = {
   name: string | null;
   role: string | null;
+  department: string | null;
 };
 
 type UserWithProfile = {
@@ -20,6 +22,7 @@ type UserWithProfile = {
   email: string;
   name: string | null;
   role: string | null;
+  department: string | null;
 };
 
 const dataRole: ComboboxData = [
@@ -39,6 +42,7 @@ export default function EditUserPage({
   const [formData, setFormData] = useState<Profile>({
     name: null,
     role: null,
+    department: null,
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -63,7 +67,7 @@ export default function EditUserPage({
       try {
         const { data, error } = await supabase
           .from("user_profiles")
-          .select("id, email, name, role")
+          .select("id, email, name, role, department")
           .eq("id", userid)
           .single();
 
@@ -76,6 +80,7 @@ export default function EditUserPage({
         setFormData({
           name: data.name,
           role: data.role,
+          department: data.department,
         });
       } catch (err) {
         console.error("Unexpected error:", err);
@@ -106,6 +111,10 @@ export default function EditUserPage({
 
   const handleRoleChange = (value: string) => {
     setFormData((prevData) => ({ ...prevData, role: value }));
+  };
+
+  const handleDepartmentChange = (value: string) => {
+    setFormData((prevData) => ({ ...prevData, department: value || null }));
   };
 
   const handleUpdateProfile = async () => {
@@ -182,6 +191,7 @@ export default function EditUserPage({
       setFormData({
         name: user.name,
         role: user.role,
+        department: user.department,
       });
     }
     setUpdateError(null);
@@ -249,6 +259,22 @@ export default function EditUserPage({
               data={dataRole}
               onChange={handleRoleChange}
               defaultValue={user?.role || ""}
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="mb-2 block font-medium">Departemen</label>
+          {!editMode ? (
+            <p className="p-2 border rounded-md bg-muted/50">
+              {user?.department || "-"}
+            </p>
+          ) : (
+            <Combobox
+              key={formData.department || ""}
+              data={DEPARTMENTS}
+              onChange={handleDepartmentChange}
+              defaultValue={formData.department || ""}
             />
           )}
         </div>

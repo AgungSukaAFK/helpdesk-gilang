@@ -28,10 +28,12 @@ export function Combobox({
   data,
   onChange,
   defaultValue,
+  disabled,
 }: {
   data: ComboboxData;
   defaultValue?: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState(defaultValue || "");
@@ -43,6 +45,7 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className="w-full justify-between"
         >
           {value
