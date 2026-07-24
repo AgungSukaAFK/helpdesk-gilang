@@ -16,9 +16,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Inbox, HandMetal } from "lucide-react";
+import { Loader2, Inbox, HandMetal, AlertCircle } from "lucide-react";
 import { useRoleGuard } from "@/hooks/use-role-guard";
 import { ROLES } from "@/lib/auth/roles";
+
+// Status yang berarti desainer masih punya tugas berjalan (belum DONE).
+const ACTIVE_STATUSES = ["PROGRESS", "REVIEW", "REVISION"];
 
 interface Antrean {
   id: string;
@@ -37,25 +40,41 @@ export default function AntreanTugasPage() {
   const [list, setList] = useState<Antrean[]>([]);
   const [loading, setLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  // Tiket aktif milik desainer ini (jika ada) -> memblokir pengambilan tugas baru.
+  const [activeTicket, setActiveTicket] = useState<{ id: string; judul: string } | null>(null);
 
   const fetchQueue = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
-    // Antrean = tiket TO DO yang belum diambil siapa pun.
-    const { data, error } = await s
-      .from("permintaan")
-      .select("id, judul, project, departemen, due_date, created_at")
-      .eq("status", "TO DO")
-      .is("assigned_designer", null)
-      .order("due_date", { ascending: true });
 
-    if (error) {
-      toast.error("Gagal memuat antrean: " + error.message);
+    const [queueRes, activeRes] = await Promise.all([
+      // Antrean = tiket TO DO yang belum diambil siapa pun.
+      s
+        .from("permintaan")
+        .select("id, judul, project, departemen, due_date, created_at")
+        .eq("status", "TO DO")
+        .is("assigned_designer", null)
+        .order("due_date", { ascending: true }),
+      // Cek apakah desainer ini masih punya tugas yang belum beres.
+      s
+        .from("permintaan")
+        .select("id, judul")
+        .eq("assigned_designer", userId)
+        .in("status", ACTIVE_STATUSES)
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (queueRes.error) {
+      toast.error("Gagal memuat antrean: " + queueRes.error.message);
       setList([]);
     } else {
-      setList((data as Antrean[]) || []);
+      setList((queueRes.data as Antrean[]) || []);
     }
+
+    setActiveTicket(activeRes.data || null);
     setLoading(false);
-  }, [s]);
+  }, [s, userId]);
 
   useEffect(() => {
     fetchQueue();
@@ -65,6 +84,15 @@ export default function AntreanTugasPage() {
   // Jika 0 baris terupdate -> tiket sudah diambil desainer lain.
   const handleAmbil = async (ticketId: string) => {
     if (!userId) return;
+
+    // Desainer hanya boleh pegang 1 tugas aktif dalam satu waktu.
+    if (activeTicket) {
+      toast.error(
+        `Selesaikan dulu tugas "${activeTicket.judul}" sebelum mengambil tugas baru.`
+      );
+      return;
+    }
+
     setClaimingId(ticketId);
     try {
       const { data, error } = await s
@@ -113,6 +141,16 @@ export default function AntreanTugasPage() {
         </Button>
       }
     >
+      {activeTicket && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 px-4 py-3 mb-4 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Anda masih memiliki tugas yang belum selesai (
+            <span className="font-semibold">{activeTicket.judul}</span>).
+            Selesaikan tugas tersebut sebelum mengambil tugas baru.
+          </span>
+        </div>
+      )}
       <div className="border rounded-md">
         <Table>
           <TableHeader>
@@ -154,7 +192,12 @@ export default function AntreanTugasPage() {
                     <Button
                       size="sm"
                       onClick={() => handleAmbil(item.id)}
-                      disabled={claimingId === item.id}
+                      disabled={claimingId === item.id || !!activeTicket}
+                      title={
+                        activeTicket
+                          ? "Selesaikan tugas Anda saat ini terlebih dahulu"
+                          : undefined
+                      }
                     >
                       {claimingId === item.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
